@@ -3,5 +3,3 @@ gunicorn
 transformers
 torch
 mysql-connector-python
-tiktoken
-protobuf

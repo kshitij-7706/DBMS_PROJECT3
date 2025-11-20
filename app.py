@@ -19,11 +19,10 @@ def get_db_connection():
         database=os.getenv("DB_NAME")
     )
 
-
 # -----------------------------
-# 2. Load model
+# 2. Load model (FIXED)
 # -----------------------------
-model_name = "mrm8488/t5-base-finetuned-wikiSQL"
+model_name = "google/flan-t5-small"   # <--- FIX: stable & compatible
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 device = "cuda" if torch.cuda.is_available() else "cpu"
 model = AutoModelForSeq2SeqLM.from_pretrained(model_name).to(device)
@@ -32,10 +31,18 @@ model = AutoModelForSeq2SeqLM.from_pretrained(model_name).to(device)
 # 3. Convert English → SQL
 # -----------------------------
 def nl_to_sql(nl_query):
-    input_text = "translate English to SQL: " + nl_query
-    inputs = tokenizer.encode(input_text, return_tensors="pt", max_length=512, truncation=True).to(device)
-    outputs = model.generate(inputs, max_length=150, num_beams=4, early_stopping=True)
-    return tokenizer.decode(outputs[0], skip_special_tokens=True)
+    prompt = f"Write an SQL query for: {nl_query}"
+    inputs = tokenizer(prompt, return_tensors="pt").to(device)
+
+    outputs = model.generate(
+        **inputs,
+        max_length=128,
+        num_beams=4,
+        early_stopping=True
+    )
+
+    sql_query = tokenizer.decode(outputs[0], skip_special_tokens=True)
+    return sql_query.strip()
 
 # -----------------------------
 # 4. Execute SQL on DB
@@ -61,16 +68,22 @@ def index():
     if request.method == "POST":
         user_query = request.form["user_query"]
         sql_query = nl_to_sql(user_query)
-        columns, result = execute_sql(sql_query)
 
         print("SQL Query:", sql_query)
-        print("Columns:", columns)
-        print("Result:", result)
 
+        columns, result = execute_sql(sql_query)
 
         if columns is None:
-            return render_template("result.html", user_query=user_query, sql_query=sql_query, error=result)
-        return render_template("result.html", user_query=user_query, sql_query=sql_query, columns=columns, result=result)
+            return render_template("result.html",
+                                   user_query=user_query,
+                                   sql_query=sql_query,
+                                   error=result)
+
+        return render_template("result.html",
+                               user_query=user_query,
+                               sql_query=sql_query,
+                               columns=columns,
+                               result=result)
 
     return render_template("index.html")
 
