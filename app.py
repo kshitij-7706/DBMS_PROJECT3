@@ -2,20 +2,23 @@ from flask import Flask, render_template, request
 import mysql.connector
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 import torch
+import os
 
 app = Flask(__name__)
 
 # -----------------------------
 # 1. Database connection
 # -----------------------------
+
 def get_db_connection():
     return mysql.connector.connect(
         host=os.getenv("DB_HOST"),
+        port=os.getenv("DB_PORT"),
         user=os.getenv("DB_USER"),
         password=os.getenv("DB_PASSWORD"),
-        database=os.getenv("DB_NAME"),
-        port=int(os.getenv("DB_PORT", "3306"))
+        database=os.getenv("DB_NAME")
     )
+
 
 # -----------------------------
 # 2. Load model
