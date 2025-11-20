@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>AI SQL Assistant 💬</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background-color: #0f172a; color: white; }
+    .chat-container { height: 80vh; overflow-y: auto; }
+    .bubble-user { background: #4f46e5; padding: 10px 14px; border-radius: 12px 12px 0 12px; display: inline-block; }
+    .bubble-bot { background: #1e293b; padding: 10px 14px; border-radius: 12px 12px 12px 0; display: inline-block; }
+    table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+    th, td { padding: 6px 10px; border: 1px solid #475569; text-align: left; }
+    th { background-color: #334155; }
+  </style>
+</head>
+<body class="flex flex-col items-center justify-center p-4">
+
+  <div class="w-full max-w-3xl bg-gray-800 rounded-2xl shadow-xl p-6 flex flex-col">
+    <h1 class="text-2xl font-bold text-indigo-400 text-center mb-4">AI-Powered SQL Assistant 💬</h1>
+
+    <div id="chat" class="chat-container flex flex-col space-y-4 p-2 bg-gray-900 rounded-xl"></div>
+
+    <div class="flex mt-4">
+      <input id="user_input" type="text" placeholder="Type your query..."
+        class="flex-grow p-3 rounded-l-xl text-black focus:outline-none" />
+      <button onclick="sendQuery()"
+        class="bg-indigo-600 hover:bg-indigo-700 px-6 rounded-r-xl text-white font-semibold">Send 🚀</button>
+    </div>
+  </div>
+
+  <script>
+    const chatBox = document.getElementById('chat');
+
+    function addMessage(content, sender) {
+      const msg = document.createElement('div');
+      msg.classList.add('flex', sender === 'user' ? 'justify-end' : 'justify-start');
+      msg.innerHTML = `<div class="${sender === 'user' ? 'bubble-user' : 'bubble-bot'}">${content}</div>`;
+      chatBox.appendChild(msg);
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    async function sendQuery() {
+      const input = document.getElementById('user_input');
+      const text = input.value.trim();
+      if (!text) return;
+
+      addMessage(text, 'user');
+      input.value = '';
+
+      addMessage("Thinking... 🤔", 'bot');
+
+      const res = await fetch('/query', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_query: text })
+      });
+      const data = await res.json();
+
+      chatBox.lastChild.remove(); // remove "Thinking..." message
+
+      if (data.error) {
+        addMessage(`<b>SQL:</b> ${data.sql_query}<br>⚠️ <b>Error:</b> ${data.error}`, 'bot');
+      } else {
+        let html = `<b>SQL:</b> ${data.sql_query}<br><br><b>Results:</b><br><table><thead><tr>`;
+        data.columns.forEach(col => html += `<th>${col}</th>`);
+        html += `</tr></thead><tbody>`;
+        data.results.forEach(row => {
+          html += `<tr>`;
+          data.columns.forEach(col => html += `<td>${row[col]}</td>`);
+          html += `</tr>`;
+        });
+        html += `</tbody></table>`;
+        addMessage(html, 'bot');
+      }
+    }
+  </script>
+</body>
+</html>
