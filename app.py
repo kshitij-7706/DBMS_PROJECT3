@@ -9,7 +9,6 @@ app = Flask(__name__)
 # -----------------------------
 # 1. Database connection
 # -----------------------------
-
 def get_db_connection():
     return mysql.connector.connect(
         host=os.getenv("DB_HOST"),
@@ -19,18 +18,29 @@ def get_db_connection():
         database=os.getenv("DB_NAME")
     )
 
-# -----------------------------
-# 2. Load model (FIXED)
-# -----------------------------
-model_name = "google/flan-t5-small"   # <--- FIX: stable & compatible
-tokenizer = AutoTokenizer.from_pretrained(model_name)
+# ----------------------------------------------------
+# 2. LAZY LOAD MODEL (Fix for Render Memory Issue)
+# ----------------------------------------------------
+model = None
+tokenizer = None
 device = "cuda" if torch.cuda.is_available() else "cpu"
-model = AutoModelForSeq2SeqLM.from_pretrained(model_name).to(device)
+
+def load_model():
+    global model, tokenizer
+    if model is None:
+        print("🔥 Loading FLAN-T5 model (lazy)...")
+        model_name = "google/flan-t5-small"
+        tokenizer = AutoTokenizer.from_pretrained(model_name)
+        model = AutoModelForSeq2SeqLM.from_pretrained(model_name).to(device)
+        print("✅ Model loaded successfully!")
+    return model, tokenizer
 
 # -----------------------------
 # 3. Convert English → SQL
 # -----------------------------
 def nl_to_sql(nl_query):
+    model, tokenizer = load_model()
+
     prompt = f"Write an SQL query for: {nl_query}"
     inputs = tokenizer(prompt, return_tensors="pt").to(device)
 
@@ -67,8 +77,8 @@ def execute_sql(sql_query):
 def index():
     if request.method == "POST":
         user_query = request.form["user_query"]
-        sql_query = nl_to_sql(user_query)
 
+        sql_query = nl_to_sql(user_query)
         print("SQL Query:", sql_query)
 
         columns, result = execute_sql(sql_query)
